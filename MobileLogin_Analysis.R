@@ -8,18 +8,15 @@ library(data.table)
 
 setwd("c:/myfiles")
 
-### DEVICE LOOKUPS ###
+### DEVICE LOOKUP IMPORT & WRANGLING ###
 
-# Import Device Model Number to Product Name tables
-# Load & Wrangle ANDROID device list from local CSV file (from https://support.google.com/googleplay/answer/1727131?hl=en)
-AndroidDevices <- read_csv("original_AndroidDevices.csv")
-names(AndroidDevices)[names(AndroidDevices)=="Retail Branding"] <- "RETAIL_BRANDING"
-names(AndroidDevices)[names(AndroidDevices)=="Marketing Name"] <- "FRIENDLY_PRODUCT_NAME"
+# Load & Wrangle ANDROID device list from local CSV file
+AndroidDevices <- read.csv("http://storage.googleapis.com/play_public/supported_devices.csv", fileEncoding = "UCS-2LE")
+names(AndroidDevices)[names(AndroidDevices)=="Retail.Branding"] <- "RETAIL_BRANDING"
+names(AndroidDevices)[names(AndroidDevices)=="Marketing.Name"] <- "FRIENDLY_PRODUCT_NAME"
 names(AndroidDevices)[names(AndroidDevices)=="Device"] <- "DEVICE_MODEL"
 names(AndroidDevices)[names(AndroidDevices)=="Model"] <- "DEVICE_MODEL_2"
 AndroidDevices$PRODUCT_MODEL_INFO <- c("N/A")
-# Excluding 6 of 14.6k rows that split incorrectly due to "," in manufacturer name
-AndroidDevices$X5 <- NULL
 
 # Load & Wrangle APPLE device list from local CSV file (from https://support.hockeyapp.net/kb/client-integration-ios-mac-os-x-tvos/ios-device-types)
 AppleDevices <- read_csv("original_AppleDevices.csv")
@@ -37,7 +34,7 @@ write_csv(MasterDeviceList, "clean_MasterDeviceList.csv")
 write_csv(AndroidDevices, "clean_AndroidDevices.csv")
 write_csv(AppleDevices, "clean_AppleDevices.csv")
 
-### LOGIN ANALYSIS ###
+### LOGIN DATA IMPORT & WRANGLING ###
 
 # Import merged login data file 
 Login <- read_csv("original_MobileLogin.csv")
@@ -53,11 +50,46 @@ Login$WeekNumber <- strftime(Login$Date, format = "%W")
 
 write_csv(Login, "clean_MobileLogin.csv")
 
+### IMPORT LOGIN DATA DEVICE LOOKUP ###
+
+# iOS Import data files for login activity and device lookup
+Login <- read_csv("clean_MobileLogin.csv")
+Devices <- read_csv("clean_MasterDeviceList.csv")
+
+# Filter data files to iOS info
+LoginApple <- filter(Login, DEVICE_TYPE!="Android")
+Devices <- filter(Devices, RETAIL_BRANDING=="Apple")
+
+# Save full join into new data frame
+new_LoginApple <- full_join(LoginApple, Devices, by = "DEVICE_MODEL")
+
+
+# ANDROID Import data files for login activity and device lookup
+Login <- read_csv("clean_MobileLogin.csv")
+Devices <- read_csv("clean_MasterDeviceList.csv")
+
+# Filter data files to iOS info
+LoginAndroid <- filter(Login, DEVICE_TYPE=="Android")
+Devices <- filter(Devices, RETAIL_BRANDING!="Apple")
+
+new_LoginAndroid <- full_join(LoginAndroid, Devices, by = "DEVICE_MODEL")
+
+
+### LOGIN DATA QUALITY ANALYSIS & MEASUREMENT ###
+Login <- read_csv("clean_MobileLogin.csv")
+Devices <- read_csv("clean_MasterDeviceList.csv")
+LoginApple <- filter(Login, DEVICE_TYPE!="Android")
+Devices <- filter(Devices, RETAIL_BRANDING=="Apple")
+
+sum <- new_LoginApple %>% group_by(FRIENDLY_PRODUCT_NAME) %>% summarise(Total = sum(Volume))
+
+
 # Filter, assess quality, size, stats (mean, min, max)
-  # filter
-  # missing or unexpected values
-  # mean, min, max
-  # regression
+# filter
+# missing or unexpected values
+# mean, min, max
+# regression
+
 
 # Import master device lookup list
 MasterDeviceList <- read_csv("MasterDeviceList.csv")
@@ -69,9 +101,9 @@ MasterDeviceList <- read_csv("MasterDeviceList.csv")
 
 # iOS Failure/Success/Policy volume by Device and Authentication Method
 
-x <- filter(Login, RESULT_DISPOSITION=="SUCCESS" & DEVICE_TYPE!="Android" )
+x <- filter(new_LoginApple, RESULT_DISPOSITION=="SUCCESS" & DEVICE_TYPE!="Android" )
 
-ggplot(data = x, aes(x = Volume, y = DEVICE_MODEL, size = Volume, color = AUTH_METHOD)) + 
+ggplot(data = x, aes(x = Volume, y = FRIENDLY_PRODUCT_NAME, size = Volume, color = AUTH_METHOD)) + 
   geom_jitter()
   geom_point()
 
