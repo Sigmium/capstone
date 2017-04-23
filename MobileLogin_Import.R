@@ -1,9 +1,10 @@
 # load required libraries
 library(readr)
 library(data.table)
+library(dplyr)
 
 # Set location of source files as working directory
-setwd("c:/myFiles/raw_data")
+setwd("c:/myFiles/")
 
 # Get list of available CSV files
 filelist <- list.files(pattern="*.csv")
