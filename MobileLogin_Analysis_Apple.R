@@ -4,16 +4,17 @@ library(tidyr)
 library(ggplot2)
 library(readr)
 library(data.table) 
+library(vtreat) 
 
-setInternet2(NA)
+# Comments listed as "TODO:" indicate work required for the subsiquent code
 
 setwd("c:/myFiles/")
 
 #### DATA IMPORT, WRANGLING & LOOKUP (TODO=1) ####
 
 # Import Apple Device lookup data from URL
-# AppleDevices <- read_csv("https://raw.githubusercontent.com/Sigmium/capstone/master/original_AppleDevices.csv")
-AppleDevices <- read_csv("original_AppleDevices.csv")
+AppleDevices <- read_csv("https://raw.githubusercontent.com/Sigmium/capstone/master/original_AppleDevices.csv")
+# AppleDevices <- read_csv("original_AppleDevices.csv")
   
 # Wrangle and structure lookup data for later lookups and possible merging into larger device lookup table 
 names(AppleDevices)[names(AppleDevices)=="DEVICE TYPE"] <- "DEVICE_MODEL"
@@ -31,7 +32,7 @@ AppleDevices$DEVICE_MODEL_2 <- c("N/A")
 Login <- read.csv("original_MobileLogin.csv")
 
 # Conduct preliminary data filtering, wrangling and cleanup
-# TODO: Add comment to explain filtering 
+# TODO: Resolve Login$Hour <- error (output is 00:00 for all)
 Login <- filter(Login, DEVICE_TYPE != "Android") %>%
   filter(CHANNEL__TYPE == "MOBILE") %>%
   filter(DEVICE_MODEL!="x86_64") %>%
@@ -42,6 +43,12 @@ names(Login)[names(Login)=="DEVICE_TYPE"] <- "APP_TYPE"
 Login$RESULT_DISPOSITION <- as.character(Login$RESULT_DISPOSITION)
 Login <- filter(RESULT_DISPOSITION!="UNKNOWN")
 Login$Timestamp <- format(Login$Timestamp, tz="America/New_York",usetz=TRUE)
+Login$Date <- as.Date(Login$Timestamp,  tz="America/New_York")
+# Login$Hour <- strftime(Login$Timestamp, format = "%R")
+Login$Weekday <- weekdays(as.Date(Login$Timestamp))
+Login$Weekday <- format(Login$Weekday, tz="America/New_York",usetz=FALSE)
+Login$WeekNumber <- strftime(Login$Timestamp, format = "%U")
+Login$WeekNumber <- format(Login$WeekNumber, tz="America/New_York",usetz=FALSE)
 
 # Lookup and merge device info then append device super group names
 Login <- full_join(Login, AppleDevices, by = "DEVICE_MODEL")
@@ -51,10 +58,6 @@ Login <- Login %>% mutate(DEVICE_SUPERGROUP_NAME = sub('^iPhone.*', 'iPhone', DE
   mutate(DEVICE_SUPERGROUP_NAME = sub('^iPad.*', 'iPad', DEVICE_SUPERGROUP_NAME)) %>%
   filter(!is.na(DEVICE_SUPERGROUP_NAME)) %>%
   filter(!is.na(Timestamp))
-
-# Conditioning and other prep for analysis
-# Login$Weekday <- weekdays(as.Date(Login$Timestamp))
-# Login$WeekNumber <- strftime(Login$Timestamp, format = "%W")
 
 # Save/Load clean login data file from APPLE devices
 # write_csv(Login, "clean_APPLE_MobileLogin.csv")
@@ -310,6 +313,15 @@ ggplot(x_fin, aes(x = FRIENDLY_PRODUCT_NAME, y = FAIL_RATE))+
 #### INVESTIGATION, REGRESSION, PROJECTION, ETC (TODO=1+) ####
 # Statistics, regression, ? 
 
+Login$RESULT_DISPOSITION2 <- Login$RESULT_DISPOSITION
+
+Login <- Login %>% 
+  mutate(RESULT_DISPOSITION2 = sub('SUCCESS', 'FALSE', RESULT_DISPOSITION2)) %>%
+  mutate(RESULT_DISPOSITION2 = sub('POLICY', 'FALSE', RESULT_DISPOSITION2)) %>%
+  mutate(RESULT_DISPOSITION2 = sub('DEFECT', 'TRUE', RESULT_DISPOSITION2)) 
+
+dTrainC <- data.frame(x = c(Login$DEVICE_SUPERGROUP_NAME), z = c(Login$USER_STATUS_CODE), y = c(Login$RESULT_DISPOSITION2))
+treatmentsC <- designTreatmentsC(dTrainC, colnames(dTrainC), 'y', TRUE)
 
 
 #### MISC CODE - SAVE FOR LATER ####
@@ -461,3 +473,25 @@ sum_by_device <- Login %>% group_by(FRIENDLY_PRODUCT_NAME) %>%
 # Create bar chart or plot showing distribution of login by device
 ggplot(data = sum_by_device, aes(x = FRIENDLY_PRODUCT_NAME, y = Volume)) +
   geom_()
+
+#### WORKSPACE ####
+x <- Login %>% 
+  group_by(Timestamp, DEVICE_SUPERGROUP_NAME, FRIENDLY_PRODUCT_NAME, AUTH_METHOD, RESULT_DISPOSITION) %>%
+  summarise(Total = sum(Volume)) %>% 
+  spread(RESULT_DISPOSITION, Total) 
+x$SUCCESS [is.na(x$SUCCESS)] <- 0
+x$POLICY [is.na(x$POLICY)] <- 0
+x$DEFECT [is.na(x$DEFECT)] <- 0
+x <- x %>%
+  mutate(TOTAL = (SUCCESS + POLICY + DEFECT)) %>%
+  mutate(POLICY_RATE = POLICY / (SUCCESS + POLICY + DEFECT)) %>%
+  mutate(FAIL_RATE = DEFECT / (SUCCESS + POLICY + DEFECT))
+x$Weekday <- weekdays(as.Date(x$Timestamp))
+x$WeekNumber <- strftime(x$Timestamp, format = "%W")
+
+xiPhone <- x %>% filter(DEVICE_SUPERGROUP_NAME == "iPhone")
+xiPad <- x %>% filter(DEVICE_SUPERGROUP_NAME == "iPad")
+xiPod <- x %>% filter(DEVICE_SUPERGROUP_NAME == "iPod Touch")
+
+> model1_total = lm(FAIL_RATE ~ APP_VERSION, data=x)
+> summary(model1_total)
