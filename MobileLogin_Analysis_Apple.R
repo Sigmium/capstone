@@ -6,17 +6,18 @@ library(readr)
 library(data.table) 
 library(vtreat) 
 
-# Comments listed as "TODO:" indicate work required for the subsiquent code
+# Comments listed as "TODO:" indicate work required for the subsequent code
+# Regression: Predict volume by timestamp, device volume, general anomaly (of any kind?), volume by device to detect app level fatal errors
 
 setwd("c:/myFiles/")
 
 #### DATA IMPORT, WRANGLING & LOOKUP (TODO=1) ####
 
 # Import Apple Device lookup data from URL
-AppleDevices <- read_csv("https://raw.githubusercontent.com/Sigmium/capstone/master/original_AppleDevices.csv")
-# AppleDevices <- read_csv("original_AppleDevices.csv")
-  
-# Wrangle and structure lookup data for later lookups and possible merging into larger device lookup table 
+# AppleDevices <- read_csv("https://raw.githubusercontent.com/Sigmium/capstone/master/original_AppleDevices.csv")
+AppleDevices <- read_csv("original_AppleDevices.csv")
+
+# Wrangle and structure lookup data for later lookups and possible merging into larger device lookup table
 names(AppleDevices)[names(AppleDevices)=="DEVICE TYPE"] <- "DEVICE_MODEL"
 names(AppleDevices)[names(AppleDevices)=="PRODUCT NAME"] <- "PRODUCT_NAME"
 AppleDevices <- AppleDevices %>% 
@@ -43,8 +44,11 @@ names(Login)[names(Login)=="DEVICE_TYPE"] <- "APP_TYPE"
 Login$RESULT_DISPOSITION <- as.character(Login$RESULT_DISPOSITION)
 Login <- filter(RESULT_DISPOSITION!="UNKNOWN")
 Login$Timestamp <- format(Login$Timestamp, tz="America/New_York",usetz=TRUE)
+# Login$Timestamp <- as.POSIXct(Login$Timestamp, tz = "America/New_York", format = '%Y-%m-%dT%H:%M:%S')
 Login$Date <- as.Date(Login$Timestamp,  tz="America/New_York")
 # Login$Hour <- strftime(Login$Timestamp, format = "%R")
+# Should be(?):
+# Login$Hour <- strftime(Login$Timestamp, "%H:%M")
 Login$Weekday <- weekdays(as.Date(Login$Timestamp))
 Login$Weekday <- format(Login$Weekday, tz="America/New_York",usetz=FALSE)
 Login$WeekNumber <- strftime(Login$Timestamp, format = "%U")
@@ -62,8 +66,8 @@ Login <- Login %>% mutate(DEVICE_SUPERGROUP_NAME = sub('^iPhone.*', 'iPhone', DE
 # Save/Load clean login data file from APPLE devices
 # write_csv(Login, "clean_APPLE_MobileLogin.csv")
 # Login <- read_csv("clean_APPLE_MobileLogin.csv")
-                    
-#### DATA QUALITY ANALYSIS & MEASUREMENT (TODO=1)####
+
+#### DATA QUALITY ANALYSIS & MEASUREMENT (TODO=0)####
 
 # QC - Lookup functionality
 lookup_quality <- Login %>%
@@ -71,15 +75,17 @@ lookup_quality <- Login %>%
   summarise(Total = sum(Volume))
 
 # QC - Expected/unexpected values, min, max, mean, null
-# TODO
+# Summary of data file
+str(Login)
+summary(Login)
 
 # QC - Summary of Data Quality Observations (to be excluded from analysis)
-dq_observations <- filter(Login, DEVICE_MODEL=="x86_64" | RESULT_DISPOSITION=="UNKNOWN" | is.na(FRIENDLY_PRODUCT_NAME))
+dq_anomaly <- filter(Login, DEVICE_MODEL=="x86_64" | RESULT_DISPOSITION=="UNKNOWN" | is.na(FRIENDLY_PRODUCT_NAME))
 
-#### TOP LEVEL LOGIN VOLUME, POLICY/FAILURE RATE & DISTRIBUTION (TODO=6)  ####
+#### TOP LEVEL LOGIN VOLUME, POLICY/FAILURE RATE & DISTRIBUTION (TODO=4)  ####
 
 # Totals by Device (Super group)
-total_VOLUME_by_device_supgroup <- Login %>% 
+total_VOLUME_by_super_device <- Login %>% 
   filter(!is.na(RESULT_DISPOSITION)) %>%
   group_by(DEVICE_SUPERGROUP_NAME, RESULT_DISPOSITION) %>% 
   summarise(Total = sum(Volume)) %>% 
@@ -87,11 +93,12 @@ total_VOLUME_by_device_supgroup <- Login %>%
 total_VOLUME_by_super_device$SUCCESS [is.na(total_VOLUME_by_super_device$SUCCESS)] <- 0
 total_VOLUME_by_super_device$POLICY [is.na(total_VOLUME_by_super_device$POLICY)] <- 0
 total_VOLUME_by_super_device$DEFECT [is.na(total_VOLUME_by_super_device$DEFECT)] <- 0
-total_VOLUME_by_super_device <- mutate(total_VOLUME_by_super_device, TOTAL = (SUCCESS + POLICY + DEFECT)) 
-# TODO stack bar with totals by super group - ggplot(totals, aes(x = DEVICE_SUPERGROUP_NAME, y = TOTAL))+
-# geom_line()
+total_VOLUME_by_super_device <- mutate(total_VOLUME_by_super_device, TOTAL = (SUCCESS + POLICY + DEFECT))
+# Bar chart: super device by volume
+ggplot(total_VOLUME_by_super_device, aes(x = DEVICE_SUPERGROUP_NAME, y = TOTAL))+
+  geom_col()
 
-  
+
 # Totals by Device (Sub group)
 total_VOLUME_by_device_subgroup <- Login %>% 
   group_by(FRIENDLY_PRODUCT_NAME, RESULT_DISPOSITION) %>% 
@@ -100,20 +107,22 @@ total_VOLUME_by_device_subgroup <- Login %>%
 total_VOLUME_by_device_subgroup$SUCCESS [is.na(total_VOLUME_by_device_subgroup$SUCCESS)] <- 0
 total_VOLUME_by_device_subgroup$POLICY [is.na(total_VOLUME_by_device_subgroup$POLICY)] <- 0
 total_VOLUME_by_device_subgroup$DEFECT [is.na(total_VOLUME_by_device_subgroup$DEFECT)] <- 0
-total_VOLUME_by_device_subgroup <- mutate(total_VOLUME_by_device_subgroup, TOTAL = (SUCCESS + POLICY + DEFECT)) 
+total_VOLUME_by_device_subgroup <- mutate(total_VOLUME_by_device_subgroup, TOTAL = (SUCCESS + POLICY + DEFECT))
 total_VOLUME_by_device_subgroup <- filter(total_VOLUME_by_device_subgroup, TOTAL > 0)
-# TODO stack bar with totals by sub group - ggplot(totals, aes(x = DEVICE_SUPERGROUP_NAME, y = TOTAL))+
-# geom_line()
+# Horizontal bar chart: sub device by volume
+ggplot(total_VOLUME_by_device_subgroup, aes(x = FRIENDLY_PRODUCT_NAME, y = TOTAL))+
+  geom_col()+ 
+  coord_flip()
 
 # Hourly Totals by Device (Sub group)
 total_hourly_VOLUME_by_sub_device <- Login %>% 
-  group_by(Timestamp, FRIENDLY_PRODUCT_NAME, RESULT_DISPOSITION) %>% 
+  group_by(Timestamp, FRIENDLY_PRODUCT_NAME, RESULT_DISPOSITION) %>%
   summarise(Total = sum(Volume)) %>% 
   spread(RESULT_DISPOSITION, Total)
 total_hourly_VOLUME_by_sub_device$SUCCESS [is.na(total_hourly_VOLUME_by_sub_device$SUCCESS)] <- 0
 total_hourly_VOLUME_by_sub_device$POLICY [is.na(total_hourly_VOLUME_by_sub_device$POLICY)] <- 0
 total_hourly_VOLUME_by_sub_device$DEFECT [is.na(totals$DEFECT)] <- 0
-total_hourly_VOLUME_by_sub_device <- mutate(total_hourly_VOLUME_by_sub_device, TOTAL = (SUCCESS + POLICY + DEFECT)) 
+total_hourly_VOLUME_by_sub_device <- mutate(total_hourly_VOLUME_by_sub_device, TOTAL = (SUCCESS + POLICY + DEFECT))
 total_hourly_VOLUME_by_sub_device <- filter(total_hourly_VOLUME_by_sub_device, TOTAL > 0)
 total_hourly_VOLUME_by_sub_device$'<NA>' <- total_hourly_VOLUME_by_sub_device$'<NA>' <- NULL
 
@@ -153,7 +162,7 @@ ggplot(rate_hourly_RESULT_supergroup_deviceiPhone, aes(x = Timestamp, y = POLICY
   geom_line(aes(col = DEVICE_SUPERGROUP_NAME))+
   geom_line(data = rate_hourly_RESULT_supergroup_deviceiPad, aes(color = DEVICE_SUPERGROUP_NAME))+
   geom_line(data = rate_hourly_RESULT_supergroup_deviceiPod, aes(color = DEVICE_SUPERGROUP_NAME))
-# TBD Find out why is this now erroring out. Err: "Fo you need to adjust group asthetuc?"
+# TODO Find out why is this now erroring out. Err: "you need to adjust group aesthetic?"
 
 ggplot(rate_hourly_RESULT_supergroup_deviceiPhone, aes(x = DEVICE_SUPERGROUP_NAME, y = POLICY_RATE))+
   geom_boxplot(aes())+
@@ -164,7 +173,7 @@ ggplot(rate_hourly_RESULT_supergroup_deviceiPhone, aes(x = Timestamp, y = FAIL_R
   geom_line(aes(color = DEVICE_SUPERGROUP_NAME))+
   geom_line(data = rate_hourly_RESULT_supergroup_deviceiPad, aes(color = DEVICE_SUPERGROUP_NAME))+
   geom_line(data = rate_hourly_RESULT_supergroup_deviceiPod, aes(color = DEVICE_SUPERGROUP_NAME))
-# TBD Find out why is this now erroring out. Err: "Fo you need to adjust group asthetuc?"
+# TBD Find out why is this now erroring out. Err: "Fo you need to adjust group aesthetic?"
 
 ggplot(rate_hourly_RESULT_supergroup_deviceiPhone, aes(x = DEVICE_SUPERGROUP_NAME, y = FAIL_RATE))+
   geom_boxplot(aes())+
@@ -176,7 +185,7 @@ ggplot(rate_hourly_RESULT_supergroup_deviceiPhone, aes(x = DEVICE_SUPERGROUP_NAM
 
 #### TOP LEVEL INVESTIGATION OF OBSERVATIONS (TODO=3) ####
 
-# Create Policy/Fail rate dataframe by device super and sub group
+# Create Policy/Fail rate data frame by device super and sub group
 rate_hourly_RESULT_subgroup_device <- Login %>% 
   group_by(Timestamp, DEVICE_SUPERGROUP_NAME,FRIENDLY_PRODUCT_NAME, RESULT_DISPOSITION) %>%
   summarise(Total = sum(Volume)) %>% 
@@ -192,7 +201,7 @@ rate_hourly_RESULT_subgroup_device <- rate_hourly_RESULT_subgroup_device %>%
   filter(TOTAL != 0) %>%
   filter(!is.na(DEVICE_SUPERGROUP_NAME))
 
-# Filter and split into dataframes for each super group
+# Filter and split into data frames for each super group
 rate_hourly_RESULT_subgroup_deviceiPhone <- rate_hourly_RESULT_subgroup_device %>% filter(DEVICE_SUPERGROUP_NAME == "iPhone")
 rate_hourly_RESULT_subgroup_deviceiPad <- rate_hourly_RESULT_subgroup_device %>% filter(DEVICE_SUPERGROUP_NAME == "iPad")
 rate_hourly_RESULT_subgroup_deviceiPod <- rate_hourly_RESULT_subgroup_device %>% filter(DEVICE_SUPERGROUP_NAME == "iPod Touch")
@@ -227,7 +236,7 @@ ggplot(rate_hourly_RESULT_subgroup_deviceiPad, aes(x = FRIENDLY_PRODUCT_NAME, y 
 ggplot(rate_hourly_RESULT_subgroup_deviceiPod, aes(x = FRIENDLY_PRODUCT_NAME, y = FAIL_RATE))+
   geom_boxplot(aes())
 
-#### SECOND LEVEL INVESTIGATION OF OSERVATIONS (TODO=4+) ####
+#### SECOND LEVEL INVESTIGATION OF OBSERVATIONS (TODO=4+) ####
 
 # Investigate observation - Elevated iPad Fail Rates
 
@@ -290,23 +299,25 @@ x <- x %>%
   filter(TOTAL != 0)
 x_pwd <- x %>% filter(AUTH_METHOD=="Password")
 x_pat <- x %>% filter(AUTH_METHOD=="Pattern")
-x_fin <- x %>% filter(AUTH_METHOD=="Finger Print")
-  
+x_fin <- x %>% filter(AUTH_METHOD=="Finger_Print")
+
 ggplot(x_pwd, aes(x = FRIENDLY_PRODUCT_NAME, y = FAIL_RATE))+
   geom_boxplot(aes())
 ggplot(x_pat, aes(x = FRIENDLY_PRODUCT_NAME, y = FAIL_RATE))+
   geom_boxplot(aes())
 ggplot(x_fin, aes(x = FRIENDLY_PRODUCT_NAME, y = FAIL_RATE))+
   geom_boxplot(aes())
-# TODO better way to vizualize? Show with the same x axis. Loosing something due to diff charts and scales? 
+# TODO better way to visualize? Show with the same x axis. Loosing something due to diff charts and scales?
 
-# TODO Investigate iPad Fail Rate - Correlation to iOS ver, App Version 
+# TODO Investigate iPad Fail Rate - Correlation to iOS ver, App Version
 
 
 # Investigate observation - Elevated Policy Rates
 # TODO Investigate Policy Rate - Split for each target sub group (iPhone 4s thru iPhone 5s) by Auth Method for high policy rate, then by App Type, iOS ver, App Version as needed
 
 # Investigate observations - iPhone 5c
+# TODO Improved view of 5c usage, when will App version catch up to this population? What iOS version are they stuck on and what is the impact?
+
 # TODO Improved view of 5c usage, when will App version catch up to this population? What iOS version are they stuck on and what is the impact? 
 
 
@@ -332,7 +343,7 @@ x <- filter(Login, RESULT_DISPOSITION=="SUCCESS" & DEVICE_TYPE!="Android" )
 
 ggplot(data = x, aes(x = Volume, y = FRIENDLY_PRODUCT_NAME, size = Volume, color = AUTH_METHOD)) + 
   geom_jitter()
-  geom_point()
+geom_point()
 
 # Success volume over time by Authentication Method
 
@@ -341,7 +352,7 @@ x <- filter(Login, RESULT_DISPOSITION=="SUCCESS") %>%
   summarise(Total = sum(Volume)) 
 
 ggplot(data = x, aes(x = Date, y = Total, fill = AUTH_METHOD)) + 
-    geom_area()
+  geom_area()
 
 
 # totals by Device, Result & Failure Rate
