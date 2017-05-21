@@ -9,6 +9,6 @@ FILE SUMMARY:
 
  ∙ MobileLogin_Import.R - R code for importing raw login data, from multiple CSV files, into a single output file
 
- ∙ sample_input_raw_login_data.csv - Sample login input data
+ ∙ original_login_data.csv - Sample raw login input data
 
  ∙ sample_output_dataframe.csv - Sample data frame on which analysis is conducted
