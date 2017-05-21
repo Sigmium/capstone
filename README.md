@@ -12,5 +12,3 @@ FILE SUMMARY:
  ∙ original_Apple_Devices.csv - Raw apple device input data file
  
  ∙ original_login_data.csv - Sample raw login input data file
-
- ∙ sample_output_dataframe.csv - Sample data frame on which analysis is conducted
