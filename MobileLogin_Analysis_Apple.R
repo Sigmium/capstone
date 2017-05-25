@@ -17,6 +17,7 @@ setwd("c:/myFiles/")
 # Import Apple Device lookup data from URL
 AppleDevices <- read_csv("https://raw.githubusercontent.com/Sigmium/capstone/master/original_AppleDevices.csv")
 
+
 # Wrangle and structure imported Apple Device lookup data 
 names(AppleDevices)[names(AppleDevices)=="DEVICE TYPE"] <- "DEVICE_MODEL"
 names(AppleDevices)[names(AppleDevices)=="PRODUCT NAME"] <- "PRODUCT_NAME"
@@ -62,7 +63,7 @@ names(Login)[names(Login)=="DEVICE_MODEL_2"] <- "DEVICE_MODEL_NOTES"
 
 
 
-
+                    
 #### DATA QUALITY ANALYSIS & MEASUREMENT ####
 
 # Quality control to validate Lookup functionality
@@ -93,7 +94,7 @@ total_VOLUME_by_super_device$POLICY [is.na(total_VOLUME_by_super_device$POLICY)]
 total_VOLUME_by_super_device$DEFECT [is.na(total_VOLUME_by_super_device$DEFECT)] <- 0
 total_VOLUME_by_super_device <- mutate(total_VOLUME_by_super_device, TOTAL = (SUCCESS + POLICY + DEFECT)) 
 ggplot(total_VOLUME_by_super_device, aes(x = DEVICE_SUPERGROUP_NAME, y = TOTAL))+
-  geom_col()
+ geom_col()
 print(total_VOLUME_by_super_device)
 
 # Review total volume by Device (Sub group)
@@ -154,9 +155,9 @@ rate_hourly_RESULT_supergroup_deviceiPod <- rate_hourly_RESULT_supergroup_device
 
 # Chart POLICY rate over time by device super group
 ggplot(rate_hourly_RESULT_supergroup_deviceiPhone, aes(x = Timestamp, y = POLICY_RATE))+
-  geom_line(aes(col = DEVICE_SUPERGROUP_NAME))+
-  geom_line(data = rate_hourly_RESULT_supergroup_deviceiPad, aes(color = DEVICE_SUPERGROUP_NAME))+
-  geom_line(data = rate_hourly_RESULT_supergroup_deviceiPod, aes(color = DEVICE_SUPERGROUP_NAME))
+  geom_line(aes(col = DEVICE_SUPERGROUP_NAME, group = DEVICE_SUPERGROUP_NAME))+
+  geom_line(data = rate_hourly_RESULT_supergroup_deviceiPad, aes(color = DEVICE_SUPERGROUP_NAME, group = DEVICE_SUPERGROUP_NAME))+
+  geom_line(data = rate_hourly_RESULT_supergroup_deviceiPod, aes(color = DEVICE_SUPERGROUP_NAME, group = DEVICE_SUPERGROUP_NAME))
 
 # Box plot hourly POLICY rate counts 
 ggplot(rate_hourly_RESULT_supergroup_deviceiPhone, aes(x = DEVICE_SUPERGROUP_NAME, y = POLICY_RATE))+
@@ -166,9 +167,9 @@ ggplot(rate_hourly_RESULT_supergroup_deviceiPhone, aes(x = DEVICE_SUPERGROUP_NAM
 
 # Chart FAILURE rate over time by device super group
 ggplot(rate_hourly_RESULT_supergroup_deviceiPhone, aes(x = Timestamp, y = FAIL_RATE))+
-  geom_line(aes(color = DEVICE_SUPERGROUP_NAME))+
-  geom_line(data = rate_hourly_RESULT_supergroup_deviceiPad, aes(color = DEVICE_SUPERGROUP_NAME))+
-  geom_line(data = rate_hourly_RESULT_supergroup_deviceiPod, aes(color = DEVICE_SUPERGROUP_NAME))
+  geom_line(aes(color = DEVICE_SUPERGROUP_NAME, group = DEVICE_SUPERGROUP_NAME))+
+  geom_line(data = rate_hourly_RESULT_supergroup_deviceiPad, aes(color = DEVICE_SUPERGROUP_NAME, group = DEVICE_SUPERGROUP_NAME))+
+  geom_line(data = rate_hourly_RESULT_supergroup_deviceiPod, aes(color = DEVICE_SUPERGROUP_NAME, group = DEVICE_SUPERGROUP_NAME))
 
 # Box plot hourly FAILURE rate counts 
 ggplot(rate_hourly_RESULT_supergroup_deviceiPhone, aes(x = DEVICE_SUPERGROUP_NAME, y = FAIL_RATE))+
@@ -203,7 +204,14 @@ rate_hourly_RESULT_subgroup_deviceiPod <- rate_hourly_RESULT_subgroup_device %>%
 
 # POLICY RATE - Plot policy rate over time for each super group, stacked by subgroup
 ggplot(rate_hourly_RESULT_subgroup_deviceiPhone, aes(x = Timestamp, y = POLICY_RATE))+
-  geom_line(aes(col = FRIENDLY_PRODUCT_NAME))
+  geom_line(aes(colour = FRIENDLY_PRODUCT_NAME, group = FRIENDLY_PRODUCT_NAME))
+
+ggplot(rate_hourly_RESULT_subgroup_deviceiPad, aes(x = Timestamp, y = POLICY_RATE))+
+  geom_line(aes(colour = FRIENDLY_PRODUCT_NAME, group = FRIENDLY_PRODUCT_NAME))
+
+ggplot(rate_hourly_RESULT_subgroup_deviceiPod, aes(x = Timestamp, y = POLICY_RATE))+
+  geom_line(aes(colour = FRIENDLY_PRODUCT_NAME, group = FRIENDLY_PRODUCT_NAME))
+
 
 # POLICY RATE - Box plot policy rate for each super group, split by subgroup
 ggplot(rate_hourly_RESULT_subgroup_deviceiPhone, aes(x = FRIENDLY_PRODUCT_NAME, y = POLICY_RATE))+
@@ -218,13 +226,13 @@ ggplot(rate_hourly_RESULT_subgroup_deviceiPod, aes(x = FRIENDLY_PRODUCT_NAME, y 
 # FAIL RATE - Plot fail rate over time for each super group, stacked by subgroup
 
 ggplot(rate_hourly_RESULT_subgroup_deviceiPhone, aes(x = Timestamp, y = FAIL_RATE))+
-  geom_line(aes(col = FRIENDLY_PRODUCT_NAME))
+  geom_line(aes(col = FRIENDLY_PRODUCT_NAME, group = FRIENDLY_PRODUCT_NAME))
 
 ggplot(rate_hourly_RESULT_subgroup_deviceiPad, aes(x = Timestamp, y = FAIL_RATE))+
-  geom_line(aes(col = FRIENDLY_PRODUCT_NAME))
+  geom_line(aes(col = FRIENDLY_PRODUCT_NAME, group = FRIENDLY_PRODUCT_NAME))
 
 ggplot(rate_hourly_RESULT_subgroup_deviceiPod, aes(x = Timestamp, y = FAIL_RATE))+
-  geom_line(aes(col = FRIENDLY_PRODUCT_NAME))
+  geom_line(aes(col = FRIENDLY_PRODUCT_NAME, group = FRIENDLY_PRODUCT_NAME))
 
 # FAIL RATE - Box plot fail rate over time for each super group, stacked by subgroup
 ggplot(rate_hourly_RESULT_subgroup_deviceiPhone, aes(x = FRIENDLY_PRODUCT_NAME, y = FAIL_RATE))+
@@ -305,13 +313,21 @@ x <- x %>%
 x_pwd <- x %>% filter(AUTH_METHOD=="Password")
 x_pat <- x %>% filter(AUTH_METHOD=="Pattern")
 x_fin <- x %>% filter(AUTH_METHOD=="FingerPrint")
-
+  
 ggplot(x_pwd, aes(x = FRIENDLY_PRODUCT_NAME, y = FAIL_RATE))+
-  geom_boxplot(aes())
+  geom_boxplot(aes()) +
+  facet_grid(. ~ AUTH_METHOD, scales = "free") +
+  theme_classic()
+
 ggplot(x_pat, aes(x = FRIENDLY_PRODUCT_NAME, y = FAIL_RATE))+
-  geom_boxplot(aes())
+  geom_boxplot(aes()) +
+  facet_grid(. ~ AUTH_METHOD, scales = "free") +
+  theme_classic()
+
 ggplot(x_fin, aes(x = FRIENDLY_PRODUCT_NAME, y = FAIL_RATE))+
-  geom_boxplot(aes())
+  geom_boxplot(aes())+
+  facet_grid(. ~ AUTH_METHOD, scales = "free") +
+  theme_classic()
 
 
 
@@ -331,7 +347,7 @@ Login <- Login %>%
   mutate(RESULT_FAIL = sub('POLICY', 0, RESULT_FAIL)) %>%
   mutate(RESULT_FAIL = sub('DEFECT', 1, RESULT_FAIL)) 
 Login$RESULT_FAIL <- as.factor(Login$RESULT_FAIL)
-
+  
 # Prep dependent variables for logistic regression and prediction of POLICY (Login Policy Failure)
 # This is out of scope for current project goals, but it was easy to check. 
 # ROC results were significantly under 0.5.
@@ -395,14 +411,14 @@ Login$Hour <- as.factor(Login$Hour)
 # identify the best independent variables to use. 
 
 LogisticModel <- glm(RESULT_FAIL ~ 
-                       AUTH_METHOD
-                     + APP_VERSION
-                     + DEVICE_MODEL
-                     + DEVICE_OPERATING_SYSTEM_VERSION
-                     + Hour,
-                     weights=Volume,
-                     data=Login,
-                     family="binomial")
+                      AUTH_METHOD
+                      + APP_VERSION
+                      + DEVICE_MODEL
+                      + DEVICE_OPERATING_SYSTEM_VERSION
+                      + Hour,
+                      weights=Volume,
+                      data=Login,
+                      family="binomial")
 summary(LogisticModel)
 
 # Split data for training, testing and prediction
@@ -478,9 +494,9 @@ FailRate <- FailRate %>% group_by(Timestamp, DEVICE_SUPERGROUP_NAME, FRIENDLY_PR
   filter(!is.na(FRIENDLY_PRODUCT_NAME))
 
 ggplot(data = FailRate, aes(x = TYPE, y = FAIL_RATE)) +
-  geom_boxplot() +
-  facet_grid(. ~ DEVICE_SUPERGROUP_NAME, scales = "free") +
-  theme_classic()
+    geom_boxplot() +
+    facet_grid(. ~ DEVICE_SUPERGROUP_NAME, scales = "free") +
+    theme_classic()
 
 # OBSERVATION: iPhone 5c outlier populations
 
